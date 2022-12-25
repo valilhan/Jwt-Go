@@ -1,19 +1,15 @@
 package middleware
 
-import "net/http"
-
-type authMiddleware struct {
-
-}
-
-func (auth *authMiddleware) ServeHTTP(w http.ResponseWriter, r * http.Request) {
-
-}
-
-func NewMiddleware() *authMiddleware{
-	return &authMiddleware{}
-}
-
-func (auth *authMiddleware) Middleware(next http.Handler) http.Handler {
-	return &authMiddleware{}
+import (
+	"net/http"
+	_ "context"
+	_ "time"
+)
+func Middleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func (w http.ResponseWriter, r *http.Request) {
+		// ctx := r.Context()
+		// ctx = context.WithValue(ctx, "requestTime", time.Now().Format(time.RFC3339))
+        // r = r.WithContext(ctx)
+		next.ServeHTTP(w, r)
+	})
 }
