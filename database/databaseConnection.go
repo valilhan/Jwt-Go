@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"log"
 	"os"
-
+	"github.com/valilhan/GolangWithJWT/models"
 	"github.com/joho/godotenv"
 )
 
@@ -27,14 +27,36 @@ func NewPoolDB(inDB *sql.DB) *PoolDB {
 		db: inDB,
 	}
 }
+func (pool *PoolDB) FindUserByPhone(ctx context.Context, phone string) (int, error) {
+	query := `SELECT COUNT(userId) FROM USERS WHERE phone = $1;`
+	var count int
+	err := pool.db.QueryRowContext(ctx, query, phone).Scan(&count)
+	if err != nil {
+		log.Println("FindUserByEmail query error")
+		return -1, err
+	}
+	return count, nil
+}
+func (pool *PoolDB) FindUserByEmail(ctx context.Context, email string) (int, error) {
+	query := `SELECT COUNT(userId) FROM USERS WHERE email = $1;`
+	var count int
+	err := pool.db.QueryRowContext(ctx, query, email).Scan(&count)
+	if err != nil {
+		log.Println("FindUserByEmail query error")
+		return -1, err
+	}
+	return count, nil
+}
 
-func (pool *PoolDB) GetUser(ctx context.Context, user_id string) error {
+func (pool *PoolDB) GetUser(ctx context.Context, user_id string) (*models.User, error) {
 	query := "SELECT * FROM USERS WHERE userId = $1 RETURNING"
-	res, err := pool.db.ExecContext(ctx, query, user_id)
+	var model models.User
+	err := pool.db.QueryRowContext(ctx, query, user_id).Scan(&model)
 	if err != nil {
 		log.Println("GetUser query error")
+		return nil, err
 	}
-
+	return &model, nil
 } 
 
 func OpenDB() *sql.DB {
