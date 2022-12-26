@@ -2,22 +2,20 @@ package controllers
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"log"
 	"net/http"
 	"time"
-
 	"github.com/gorilla/mux"
 	database "github.com/valilhan/GolangWithJWT/database"
 	"github.com/valilhan/GolangWithJWT/helpers"
 	models "github.com/valilhan/GolangWithJWT/models"
-	resources "github.com/valilhan/GolangWithJWT/resources"
 	"github.com/go-playground/validator/v10"
+	"strconv"
 )
 
-type ChildEnv struct {
-    resources.Env
+type Env struct {
+	Pool* database.PoolDB
 }
 var validate = validator.New() 
 
@@ -31,7 +29,7 @@ func VerifyPassword(w http.ResponseWriter, r *http.Request) {
 
 }
 
-func (env *ChildEnv) SignUp() http.Handler {
+func (env *Env) SignUp() http.Handler {
 	return http.HandlerFunc(func (w http.ResponseWriter, r *http.Request){
 		ctx, cancel := context.WithTimeout(context.Background(), 10 * time.Second)
 		defer cancel()
@@ -44,12 +42,12 @@ func (env *ChildEnv) SignUp() http.Handler {
 		if validateErr != nil {
 			log.Println("Error with validation of model in SignUp")
 		}
-		countEmail, err := env.Pool.FindUserByEmail(ctx, model.Email)
+		countEmail, err := env.Pool.FindUserByEmail(ctx, *model.Email)
 		if err != nil {
 			log.Println("FindUserByEmail query error")
 		}
 		
-		countPhone, err := env.Pool.FindUserByPhone(ctx, model.Email)
+		countPhone, err := env.Pool.FindUserByPhone(ctx, *model.Email)
 		if err != nil {
 			log.Println("FindUserByEmail query error")
 		}
@@ -57,7 +55,15 @@ func (env *ChildEnv) SignUp() http.Handler {
 		if countEmail > 0 || countPhone > 0 {
 			log.Println("This user already exists with such email or phone")
 		}
-		
+		model.CreatedAt, _ = time.Parse(time.RFC3339, time.Now().Format(time.RFC3339))
+		model.UpdatedAt, _ = time.Parse(time.RFC3339, time.Now().Format(time.RFC3339))
+		model.UserId = strconv.FormatInt(model.Id, 16)
+		token, refreshToken, _ = helpers.GenerateAllTokens(*model.FirstName, *model.LastName, *&model.Email)
+
+		// RefreshToken string    `json:"refreshToken"`
+		// CreatedAt    time.Time `json:"createdAt"`
+		// UpdatedAt    time.Time `json:"updatedAt"`
+		// UserId       string    `json:"userId"`
 	})
 }
 
@@ -65,7 +71,7 @@ func Login(w http.ResponseWriter, r *http.Request) {
 
 }
 
-func (env * ChildEnv) GetUser() http.Handler {
+func (env * Env) GetUser() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		userId := mux.Vars(r)["user_id"]
 		err := helpers.MatchUserTypeToUId(r, userId)
@@ -82,7 +88,7 @@ func (env * ChildEnv) GetUser() http.Handler {
 		json.NewEncoder(w).Encode(&user)
 	})
 }
-func (env *main.Env) GetUsers() http.Handler {
+func (env *Env) GetUsers() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		
 	})
