@@ -2,7 +2,7 @@ package middleware
 
 import (
 	"net/http"
-	_ "context"
+	"context"
 	_ "time"
 )
 func Middleware(next http.Handler) http.Handler {

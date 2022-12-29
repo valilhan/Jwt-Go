@@ -18,7 +18,7 @@ func main() {
 	env := &controllers.Env{database.NewPoolDB(db)}
 	
 	router.Handle("/api-1/users/signup", env.SignUp()).Methods("POST")
-	router.Handle("/api-1/users/login", env.Login).Methods("POST")
+	router.Handle("/api-1/users/login", env.Login()).Methods("POST")
 	router.Handle("/api-2/users", middleware.Middleware(env.GetUsers())).Methods("GET")
 	router.Handle("/api-2/users/{user_id}", middleware.Middleware(env.GetUser())).Methods("GET")
 	http.ListenAndServe(":8080", router)

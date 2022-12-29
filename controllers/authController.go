@@ -6,18 +6,20 @@ import (
 	"log"
 	"net/http"
 	"time"
+
+	"github.com/go-playground/validator/v10"
 	"github.com/gorilla/mux"
 	database "github.com/valilhan/GolangWithJWT/database"
-	"github.com/valilhan/GolangWithJWT/helpers"
+	helpers "github.com/valilhan/GolangWithJWT/helpers"
 	models "github.com/valilhan/GolangWithJWT/models"
-	"github.com/go-playground/validator/v10"
-	"strconv"
+	"golang.org/x/crypto/bcrypt"
 )
 
 type Env struct {
-	Pool* database.PoolDB
+	Pool *database.PoolDB
 }
-var validate = validator.New() 
+
+var validate = validator.New()
 
 type MyRouter mux.Router
 
@@ -25,13 +27,18 @@ func HashPassword(w http.ResponseWriter, r *http.Request) {
 
 }
 
-func VerifyPassword(w http.ResponseWriter, r *http.Request) {
-
+func VerifyPassword(originalPassword string, checkPassword string) (bool, string) {
+	err := bcrypt.CompareHashAndPassword([]byte(originalPassword), []byte(checkPassword))
+	if err != nil {
+		msg := "Password is not correct"
+		return false, msg
+	}
+	return true, ""
 }
 
 func (env *Env) SignUp() http.Handler {
-	return http.HandlerFunc(func (w http.ResponseWriter, r *http.Request){
-		ctx, cancel := context.WithTimeout(context.Background(), 10 * time.Second)
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 		var model models.User
 		err := json.NewDecoder(r.Body).Decode(&model)
@@ -46,7 +53,7 @@ func (env *Env) SignUp() http.Handler {
 		if err != nil {
 			log.Println("FindUserByEmail query error")
 		}
-		
+
 		countPhone, err := env.Pool.FindUserByPhone(ctx, *model.Email)
 		if err != nil {
 			log.Println("FindUserByEmail query error")
@@ -57,21 +64,45 @@ func (env *Env) SignUp() http.Handler {
 		}
 		model.CreatedAt, _ = time.Parse(time.RFC3339, time.Now().Format(time.RFC3339))
 		model.UpdatedAt, _ = time.Parse(time.RFC3339, time.Now().Format(time.RFC3339))
-		model.UserId = strconv.FormatInt(model.Id, 16)
-		token, refreshToken, _ = helpers.GenerateAllTokens(*model.FirstName, *model.LastName, *&model.Email)
+		model.UserId = model.UserId
+		env := helpers.Env{env.Pool}
+		token, refreshToken, _ := env.GenerateAllTokens(*model.FirstName, *model.LastName, *model.Email, *model.UserType, model.UserId)
+		model.Token = *token
+		model.RefreshToken = *refreshToken
 
-		// RefreshToken string    `json:"refreshToken"`
-		// CreatedAt    time.Time `json:"createdAt"`
-		// UpdatedAt    time.Time `json:"updatedAt"`
-		// UserId       string    `json:"userId"`
+		resultInsertionNumber, err := env.Pool.InsertUser(ctx, &model)
+		if err != nil {
+			log.Println("User not created")
+		}
+		err = json.NewEncoder(w).Encode(resultInsertionNumber)
+		if err != nil {
+			log.Println("No error in encoding")
+		}
 	})
 }
 
-func Login(w http.ResponseWriter, r *http.Request) {
-
+func (env *Env) Login() http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var findUser models.User
+		var checkUser *models.User
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+		err := json.NewDecoder(r.Body).Decode(&findUser)
+		if err != nil {
+			log.Println("Error with decoding model in Login()")
+		}
+		checkUser, err = env.Pool.FindUserByEmailOne(ctx, *findUser.Email)
+		if err != nil {
+			log.Println("Email is not correct")
+		}
+		check, msg := VerifyPassword(*findUser.Password, *checkUser.Password)
+		if check == false {
+			log.Println(msg)
+		}
+		defer cancel()
+	})
 }
 
-func (env * Env) GetUser() http.Handler {
+func (env *Env) GetUser() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		userId := mux.Vars(r)["user_id"]
 		err := helpers.MatchUserTypeToUId(r, userId)
@@ -90,6 +121,6 @@ func (env * Env) GetUser() http.Handler {
 }
 func (env *Env) GetUsers() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		
+
 	})
 }

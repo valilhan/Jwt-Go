@@ -6,8 +6,9 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"github.com/valilhan/GolangWithJWT/models"
+
 	"github.com/joho/godotenv"
+	"github.com/valilhan/GolangWithJWT/models"
 )
 
 var (
@@ -37,6 +38,23 @@ func (pool *PoolDB) FindUserByPhone(ctx context.Context, phone string) (int, err
 	}
 	return count, nil
 }
+
+func (pool *PoolDB) InsertUser(ctx context.Context, user *models.User) (int, error) {
+	//query = `INSERT INTO (`
+	
+}
+
+func (pool *PoolDB) FindUserByEmailOne(ctx context.Context, email string) (*models.User, error) {
+	var user models.User
+	query := `SELECT * FROM USERS WHERE email = $1;`
+	err := pool.db.QueryRowContext(ctx, query, email).Scan(&user)
+	if err != nil {
+		log.Println("FindUserByEmailOne query error")
+		return nil, err
+	}
+	return &user, nil
+}
+
 func (pool *PoolDB) FindUserByEmail(ctx context.Context, email string) (int, error) {
 	query := `SELECT COUNT(userId) FROM USERS WHERE email = $1;`
 	var count int
@@ -57,7 +75,7 @@ func (pool *PoolDB) GetUser(ctx context.Context, user_id string) (*models.User, 
 		return nil, err
 	}
 	return &model, nil
-} 
+}
 
 func OpenDB() *sql.DB {
 	err := godotenv.Load()
