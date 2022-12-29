@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"time"
 
 	"github.com/joho/godotenv"
 	"github.com/valilhan/GolangWithJWT/models"
@@ -38,21 +39,53 @@ func (pool *PoolDB) FindUserByPhone(ctx context.Context, phone string) (int, err
 	}
 	return count, nil
 }
+func (pool *PoolDB) SelectWithLimitOffset(ctx context.Context, startIndex int, recordPerPage int) ([]models.User, error) {
+	var users []models.User
+	query := `SELECT * FROM USERS LIMIT $1 OFFSET $2`
+	rows, err := pool.db.QueryContext(ctx, query, recordPerPage, startIndex)
+	if err != nil {
+		log.Println("Error in execute query with SelectWithLimitOffset")
+	}
+	for rows.Next() {
+		var user models.User
+		err = rows.Scan(&user)
+		if err != nil {
+			log.Println("Error in rows scanning in SelectWithLimitOffset")
+			return nil, err
+		}
+		users = append(users, user)
+	}
+	return users, nil
+}
+func (pool *PoolDB) UpdateAllTokensById(ctx context.Context, token string, refreshToken string, UserId string) error {
+	UpdatedAt, err:= time.Parse(time.RFC3339, time.Now().Format(time.RFC3339))
+	if err != nil {
+		log.Println("Getting time UpdatedAt with error")
+	}
+	query := `UPDATE USERS SET token = $1, refreshtoken = $2 WHERE, updatedat = $3 userId = $4`
+	// UPDATE table_name
+	// SET column1 = value1, column2 = value2, ...
+	// WHERE condition;
+	_, err = pool.db.ExecContext(ctx, query, token, refreshToken, UpdatedAt,UserId)
+	if err!= nil {
+		log.Println("Error with updating refreshtoken and token")
+	}
+	return err
 
+}
 func (pool *PoolDB) InsertUser(ctx context.Context, user *models.User) (int, error) {
 	//query = `INSERT INTO (`
-	
-}
 
-func (pool *PoolDB) FindUserByEmailOne(ctx context.Context, email string) (*models.User, error) {
+}
+func (pool *PoolDB) FindUserByEmailOne(ctx context.Context, email string) (models.User, error) {
 	var user models.User
 	query := `SELECT * FROM USERS WHERE email = $1;`
 	err := pool.db.QueryRowContext(ctx, query, email).Scan(&user)
 	if err != nil {
 		log.Println("FindUserByEmailOne query error")
-		return nil, err
+		return user, err
 	}
-	return &user, nil
+	return user, nil
 }
 
 func (pool *PoolDB) FindUserByEmail(ctx context.Context, email string) (int, error) {
