@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strconv"
 	"time"
+
 	"github.com/go-playground/validator/v10"
 	"github.com/gorilla/mux"
 	database "github.com/valilhan/GolangWithJWT/database"
@@ -14,19 +15,22 @@ import (
 	models "github.com/valilhan/GolangWithJWT/models"
 	"golang.org/x/crypto/bcrypt"
 )
+
 type Env struct {
 	Pool *database.PoolDB
 }
+
 var validate = validator.New()
+
 type MyRouter mux.Router
 
-func HashPassword(password string) (string) {
+func HashPassword(password string) string {
 	pass, err := bcrypt.GenerateFromPassword([]byte(password), 14)
 	if err != nil {
 		log.Panic(err)
 	}
 	return string(pass)
-} 
+}
 
 func VerifyPassword(originalPassword string, checkPassword string) (bool, string) {
 	err := bcrypt.CompareHashAndPassword([]byte(originalPassword), []byte(checkPassword))
@@ -50,22 +54,22 @@ func (env *Env) SignUp() http.Handler {
 		validateErr := validate.Struct(model)
 		if validateErr != nil {
 			log.Println("Error with validation of model in SignUp")
-			return 
+			return
 		}
 		countEmail, err := env.Pool.FindUserByEmail(ctx, *model.Email)
 		if err != nil {
 			log.Println("FindUserByEmail query error")
-			return 
+			return
 		}
 		password := HashPassword(*model.Password)
 		countPhone, err := env.Pool.FindUserByPhone(ctx, *model.Phone)
 		if err != nil {
 			log.Println("FindUserByPhone query error")
-			return 
+			return
 		}
 		if countEmail > 0 || countPhone > 0 {
 			log.Println("This user already exists with such email or phone")
-			return 
+			return
 		}
 		model.Password = &password
 		model.CreatedAt, _ = time.Parse(time.RFC3339, time.Now().Format(time.RFC3339))
@@ -101,7 +105,7 @@ func (env *Env) Login() http.Handler {
 			log.Println("Error with decoding model in Login()")
 			return
 		}
-		checkUser, err = env.Pool. FindUserByEmailOne(ctx, *findUser.Email)
+		checkUser, err = env.Pool.FindUserByEmailOne(ctx, *findUser.Email)
 		if err != nil {
 			log.Println("Email is not correct")
 			return
@@ -113,11 +117,11 @@ func (env *Env) Login() http.Handler {
 		}
 		defer cancel()
 		if checkUser.Email != nil {
-			 log.Println("User is not found")
-			 return
+			log.Println("User is not found")
+			return
 		}
 		token, refreshToken, err := helpers.GenerateAllTokens(*checkUser.FirstName, *checkUser.LastName, *checkUser.Email, *checkUser.UserType, checkUser.UserId)
-		helpers.UpdateAllTokens(env.Pool, *token, *refreshToken, *checkUser.UserId)
+		helpers.UpdateAllTokens(env.Pool, *token, *refreshToken, checkUser.UserId)
 
 	})
 }
@@ -142,31 +146,34 @@ func (env *Env) GetUser() http.Handler {
 
 func (env *Env) GetUsers() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		err := helpers.CheckUserType(r, "ADMIN"); 
+		err := helpers.CheckUserType(r, "ADMIN")
 		if err != nil {
 			log.Println("UserType is not Admin")
 			return
 		}
-		ctx, cancel := context.WithTimeout(context.Background(), time.Second * 10)
-		recordPerPage, err := strconv.Atoi(r.Context().Value('recordPerPage'))
-		if err != nil || recordPerPage < 1{
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+		recordPerPage, err := strconv.Atoi(r.Context().Value("recordPerPage").(string))
+		if err != nil || recordPerPage < 1 {
 			recordPerPage = 10
 		}
-		page, err := strconv.Atoi(r.Context().Value('page'))
+		page, err := strconv.Atoi(r.Context().Value("page").(string))
 		if err != nil || page < 1 {
 			page = 1
 		}
-		startIndex, err = strconv.Atoi(r.Context().Value('startIndex'))
+		startIndex, err := strconv.Atoi(r.Context().Value("startIndex").(string))
 		if err != nil {
 			startIndex = (page - 1) * recordPerPage
 		}
 		defer cancel()
-		users := env.Pool.SelectWithLimitOffset(ctx, startIndex, recordPerPage)
+		users, err := env.Pool.SelectWithLimitOffset(ctx, startIndex, recordPerPage)
+		if err != nil {
+			log.Println("Query error in GetUsers")
+		}
 		err = json.NewEncoder(w).Encode(users)
 		if err != nil {
 			log.Println("Error in encoding")
 			return
 		}
-		
+
 	})
 }

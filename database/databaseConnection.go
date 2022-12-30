@@ -74,8 +74,17 @@ func (pool *PoolDB) UpdateAllTokensById(ctx context.Context, token string, refre
 
 }
 func (pool *PoolDB) InsertUser(ctx context.Context, user *models.User) (int, error) {
-	//query = `INSERT INTO (`
-
+	query := `INSERT INTO USERS (id, firstname, lastname, password, email, phone,  usertype, token, refreshtoken, createdat, updatedat, userid) VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`
+	res, err := pool.db.ExecContext(ctx, query, user.Id, user.FirstName, user.LastName, user.Password, user.Email, user.Phone, user.UserType, user.Token, user.RefreshToken, user.CreatedAt, user.UpdatedAt, user.UserId)
+	if err != nil {
+		log.Println("InsertUser query error")
+		return -1, err
+	}
+	lastId, err := res.LastInsertId()
+	if err != nil {
+		log.Println("LastInsertedId error")
+	}
+	return int(lastId), nil
 }
 func (pool *PoolDB) FindUserByEmailOne(ctx context.Context, email string) (models.User, error) {
 	var user models.User
@@ -100,7 +109,7 @@ func (pool *PoolDB) FindUserByEmail(ctx context.Context, email string) (int, err
 }
 
 func (pool *PoolDB) GetUser(ctx context.Context, user_id string) (*models.User, error) {
-	query := "SELECT * FROM USERS WHERE userId = $1 RETURNING"
+	query := "SELECT * FROM USERS WHERE userId = $1"
 	var model models.User
 	err := pool.db.QueryRowContext(ctx, query, user_id).Scan(&model)
 	if err != nil {

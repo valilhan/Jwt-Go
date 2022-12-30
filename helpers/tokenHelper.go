@@ -45,7 +45,7 @@ func GenerateAllTokens(FirstName string, LastName string, Email string, UserType
 	}
 	return &token, &refreshToken, err
 }
-func UpdateAllTokens(db *database.PoolDB ,database,token string, refreshToken string, UserId string) {
+func UpdateAllTokens(db *database.PoolDB,token string, refreshToken string, UserId string) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second * 10)
 	defer cancel()
 
