@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"strconv"
 	"time"
-
 	"github.com/go-playground/validator/v10"
 	"github.com/gorilla/mux"
 	database "github.com/valilhan/GolangWithJWT/database"

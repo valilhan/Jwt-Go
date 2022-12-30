@@ -58,7 +58,7 @@ func (pool *PoolDB) SelectWithLimitOffset(ctx context.Context, startIndex int, r
 	return users, nil
 }
 func (pool *PoolDB) UpdateAllTokensById(ctx context.Context, token string, refreshToken string, UserId string) error {
-	UpdatedAt, err:= time.Parse(time.RFC3339, time.Now().Format(time.RFC3339))
+	UpdatedAt, err := time.Parse(time.RFC3339, time.Now().Format(time.RFC3339))
 	if err != nil {
 		log.Println("Getting time UpdatedAt with error")
 	}
@@ -66,8 +66,8 @@ func (pool *PoolDB) UpdateAllTokensById(ctx context.Context, token string, refre
 	// UPDATE table_name
 	// SET column1 = value1, column2 = value2, ...
 	// WHERE condition;
-	_, err = pool.db.ExecContext(ctx, query, token, refreshToken, UpdatedAt,UserId)
-	if err!= nil {
+	_, err = pool.db.ExecContext(ctx, query, token, refreshToken, UpdatedAt, UserId)
+	if err != nil {
 		log.Println("Error with updating refreshtoken and token")
 	}
 	return err

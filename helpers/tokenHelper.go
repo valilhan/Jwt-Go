@@ -2,11 +2,9 @@ package helpers
 
 import (
 	"context"
-	"database/sql"
 	"log"
 	"os"
 	"time"
-
 	jwt "github.com/dgrijalva/jwt-go"
 	database "github.com/valilhan/GolangWithJWT/database"
 )
@@ -55,8 +53,30 @@ func UpdateAllTokens(db *database.PoolDB ,database,token string, refreshToken st
 	if err != nil {
 		log.Printf("Error in UpdatedAllTokensById")
 	}
-
 }
+func VerifyToken(clientToken string) (claims *SignedDetail, msg string) {
+	token, err := jwt.ParseWithClaims(clientToken, &SignedDetail{}, func(token *jwt.Token) (interface{}, error) {
+		return []byte(SECRET_KEY), nil
+	})
+
+	if err != nil {
+		msg = err.Error()
+		return
+	}
+	claims, ok := token.Claims.(*SignedDetail)
+	if !ok {
+		msg = "The token is invalid"
+		msg = msg + err.Error()
+		return 
+	}
+	if claims.ExpiresAt < time.Now().Local().Unix() {
+		msg = "Token is expired"
+		msg = msg +err.Error()
+		return
+	}
+	return claims, msg
+}
+
 
 
 
