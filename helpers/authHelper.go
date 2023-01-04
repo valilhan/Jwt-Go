@@ -16,9 +16,9 @@ func CheckUserType(r *http.Request, user_type string) (err error) {
 	return nil
 }
 func MatchUserTypeToUId(r *http.Request, user_id string) (err error) {
-	UserId := r.Context().Value("UserId")
-	var role string = r.Context().Value("UserType").(string)
-	if UserId == user_id && role == "USER" {
+	UserId := r.Context().Value("userId")
+	var role string = r.Context().Value("userType").(string)
+	if UserId != user_id && role == "User" {
 		err := errors.New("Unauthorized to access resources not matching userId and user_id")
 		return err
 	}

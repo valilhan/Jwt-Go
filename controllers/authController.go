@@ -154,6 +154,7 @@ func (env *Env) GetUser() http.Handler {
 		err := helpers.MatchUserTypeToUId(r, userId)
 		if err != nil {
 			log.Println(err)
+			return
 		}
 		var user *models.User
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -161,6 +162,7 @@ func (env *Env) GetUser() http.Handler {
 		user, err = env.Pool.GetUser(ctx, userId)
 		if err != nil {
 			log.Println(err, "GetUser query errors")
+			return
 		}
 		json.NewEncoder(w).Encode(&user)
 	})
@@ -168,27 +170,22 @@ func (env *Env) GetUser() http.Handler {
 
 func (env *Env) GetUsers() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		vars := mux.Vars(r)
 		err := helpers.CheckUserType(r, "Admin")
 		if err != nil {
 			log.Println("UserType is not Admin")
 			return
 		}
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
-		recordPerPage, err := strconv.Atoi(r.Context().Value("recordPerPage").(string))
+		recordPerPage, err := strconv.Atoi(vars["recordPerPage"])
 		if err != nil || recordPerPage < 1 {
 			recordPerPage = 10
 		}
-		var page int = r.Context().Value("page")
-		if page == nil {
-			page = 1
-		}else {
-			page, err = strconv.Atoi(page.(string))
-		}
-	
+		page, err := strconv.Atoi(vars["page"])
 		if err != nil || page < 1 {
 			page = 1
 		}
-		startIndex, err := strconv.Atoi(r.Context().Value("startIndex").(string))
+		startIndex, err := strconv.Atoi(vars["startIndex"])
 		if err != nil {
 			startIndex = (page - 1) * recordPerPage
 		}

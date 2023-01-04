@@ -53,14 +53,16 @@ func (pool *PoolDB) FindUserByPhone(ctx context.Context, phone string) (int, err
 func (pool *PoolDB) SelectWithLimitOffset(ctx context.Context, startIndex int, recordPerPage int) ([]models.User, error) {
 	var users []models.User
 	query := `SELECT * FROM USERS LIMIT $1 OFFSET $2`
-	rows, err := pool.db.QueryContext(ctx, query, recordPerPage, startIndex)
+	rows, err := pool.db.QueryxContext(ctx, query, recordPerPage, startIndex)
 	if err != nil {
+		log.Println(err)
 		log.Println("Error in execute query with SelectWithLimitOffset")
 	}
 	for rows.Next() {
 		var user models.User
-		err = rows.Scan(&user)
+		err = rows.StructScan(&user)
 		if err != nil {
+			log.Println(err)
 			log.Println("Error in rows scanning in SelectWithLimitOffset")
 			return nil, err
 		}
@@ -120,7 +122,7 @@ func (pool *PoolDB) FindUserByEmail(ctx context.Context, email string) (int, err
 func (pool *PoolDB) GetUser(ctx context.Context, user_id string) (*models.User, error) {
 	query := "SELECT * FROM USERS WHERE userId = $1"
 	var model models.User
-	err := pool.db.QueryRowContext(ctx, query, user_id).Scan(&model)
+	err := pool.db.QueryRowxContext(ctx, query, user_id).StructScan(&model)
 	if err != nil {
 		log.Println("GetUser query error")
 		return nil, err
