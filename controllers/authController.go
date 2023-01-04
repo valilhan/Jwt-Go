@@ -74,7 +74,6 @@ func (env *Env) SignUp() http.Handler {
 		model.Password = &password
 		model.CreatedAt, _ = time.Parse(time.RFC3339, time.Now().Format(time.RFC3339))
 		model.UpdatedAt, _ = time.Parse(time.RFC3339, time.Now().Format(time.RFC3339))
-		model.UserId = model.UserId
 		token, refreshToken, err := helpers.GenerateAllTokens(*model.FirstName, *model.LastName, *model.Email, *model.UserType, model.UserId)
 		if err != nil {
 			log.Println("Genreting token problem")
@@ -100,6 +99,7 @@ func (env *Env) Login() http.Handler {
 		var findUser models.User
 		var checkUser models.User
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+		defer cancel()
 		err := json.NewDecoder(r.Body).Decode(&findUser)
 		if err != nil {
 			log.Println("Error with decoding model in Login()")
@@ -111,7 +111,7 @@ func (env *Env) Login() http.Handler {
 			return
 		}
 		check, msg := VerifyPassword(*findUser.Password, *checkUser.Password)
-		if check == false {
+		if !check {
 			log.Println(msg)
 			return
 		}
@@ -121,6 +121,9 @@ func (env *Env) Login() http.Handler {
 			return
 		}
 		token, refreshToken, err := helpers.GenerateAllTokens(*checkUser.FirstName, *checkUser.LastName, *checkUser.Email, *checkUser.UserType, checkUser.UserId)
+		if err != nil {
+			log.Print("Error in GeneratingTokens")
+		}
 		helpers.UpdateAllTokens(env.Pool, *token, *refreshToken, checkUser.UserId)
 
 	})
