@@ -33,9 +33,11 @@ func HashPassword(password string) string {
 }
 
 func VerifyPassword(originalPassword string, checkPassword string) (bool, string) {
-	err := bcrypt.CompareHashAndPassword([]byte(originalPassword), []byte(checkPassword))
+
+	err := bcrypt.CompareHashAndPassword([]byte(checkPassword), []byte(originalPassword))
 	if err != nil {
 		msg := "Password is not correct"
+		log.Println(checkPassword, originalPassword)
 		return false, msg
 	}
 	return true, ""
@@ -74,6 +76,13 @@ func (env *Env) SignUp() http.Handler {
 		model.Password = &password
 		model.CreatedAt, _ = time.Parse(time.RFC3339, time.Now().Format(time.RFC3339))
 		model.UpdatedAt, _ = time.Parse(time.RFC3339, time.Now().Format(time.RFC3339))
+		model.UserId = strconv.Itoa(int(model.Id))
+
+		if model.LastName == nil || model.FirstName == nil || model.Email == nil || model.UserType == nil || model.UserId == "" {
+			log.Println(model.UserType)
+			log.Println(model.LastName, model.FirstName, model.Email, model.UserType, model.UserId)
+			return
+		}
 		token, refreshToken, err := helpers.GenerateAllTokens(*model.FirstName, *model.LastName, *model.Email, *model.UserType, model.UserId)
 		if err != nil {
 			log.Println("Genreting token problem")
@@ -116,7 +125,8 @@ func (env *Env) Login() http.Handler {
 			return
 		}
 		defer cancel()
-		if checkUser.Email != nil {
+		if checkUser.Email == nil {
+			log.Println(checkUser.Email)
 			log.Println("User is not found")
 			return
 		}
@@ -124,7 +134,16 @@ func (env *Env) Login() http.Handler {
 		if err != nil {
 			log.Print("Error in GeneratingTokens")
 		}
-		helpers.UpdateAllTokens(env.Pool, *token, *refreshToken, checkUser.UserId)
+		checkUser.Token = *token
+		checkUser.RefreshToken = *refreshToken
+
+		UpdatedAt := helpers.UpdateAllTokens(env.Pool, *token, *refreshToken, checkUser.UserId)
+		checkUser.UpdatedAt = UpdatedAt
+		err = json.NewEncoder(w).Encode(checkUser)
+		if err != nil {
+			log.Println("Error in encoding")
+			return
+		}
 
 	})
 }
@@ -149,7 +168,7 @@ func (env *Env) GetUser() http.Handler {
 
 func (env *Env) GetUsers() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		err := helpers.CheckUserType(r, "ADMIN")
+		err := helpers.CheckUserType(r, "Admin")
 		if err != nil {
 			log.Println("UserType is not Admin")
 			return
@@ -159,7 +178,13 @@ func (env *Env) GetUsers() http.Handler {
 		if err != nil || recordPerPage < 1 {
 			recordPerPage = 10
 		}
-		page, err := strconv.Atoi(r.Context().Value("page").(string))
+		var page int = r.Context().Value("page")
+		if page == nil {
+			page = 1
+		}else {
+			page, err = strconv.Atoi(page.(string))
+		}
+	
 		if err != nil || page < 1 {
 			page = 1
 		}

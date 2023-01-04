@@ -2,29 +2,40 @@ package database
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"log"
 	"os"
+	"strconv"
 	"time"
 
+	"github.com/jmoiron/sqlx"
 	"github.com/joho/godotenv"
+	_ "github.com/lib/pq"
 	"github.com/valilhan/GolangWithJWT/models"
 )
 
-var (
-	DB_USER     = os.Getenv("DB_USER")
-	DB_PASSWORD = os.Getenv("DB_PASSWORD")
-	DB_NAME     = os.Getenv("DB_NAME")
-	DB_HOST     = os.Getenv("DB_HOST")
-	DB_PORT     = os.Getenv("DB_PORT")
-)
+// init is invoked before main()
 
-type PoolDB struct {
-	db *sql.DB
+var DB_HOST, DB_NAME, DB_PASSWORD, DB_USER string
+var DB_PORT int
+
+func init() {
+	// loads values from .env into the system
+	if err := godotenv.Load(); err != nil {
+		log.Print("No .env file found")
+	}
+	DB_USER = os.Getenv("DB_USER")
+	DB_PASSWORD = os.Getenv("DB_PASSWORD")
+	DB_NAME = os.Getenv("DB_NAME")
+	DB_HOST = os.Getenv("DB_HOST")
+	DB_PORT, _ = strconv.Atoi(os.Getenv("DB_PORT"))
 }
 
-func NewPoolDB(inDB *sql.DB) *PoolDB {
+type PoolDB struct {
+	db *sqlx.DB
+}
+
+func NewPoolDB(inDB *sqlx.DB) *PoolDB {
 	return &PoolDB{
 		db: inDB,
 	}
@@ -57,42 +68,40 @@ func (pool *PoolDB) SelectWithLimitOffset(ctx context.Context, startIndex int, r
 	}
 	return users, nil
 }
-func (pool *PoolDB) UpdateAllTokensById(ctx context.Context, token string, refreshToken string, UserId string) error {
+func (pool *PoolDB) UpdateAllTokensById(ctx context.Context, token string, refreshToken string, UserId string) (time.Time, error) {
 	UpdatedAt, err := time.Parse(time.RFC3339, time.Now().Format(time.RFC3339))
 	if err != nil {
 		log.Println("Getting time UpdatedAt with error")
 	}
-	query := `UPDATE USERS SET token = $1, refreshtoken = $2 WHERE, updatedat = $3 userId = $4`
+	query := `UPDATE USERS SET token = $1, refreshtoken = $2, updatedat = $3 WHERE userId = $4`
 	// UPDATE table_name
 	// SET column1 = value1, column2 = value2, ...
 	// WHERE condition;
 	_, err = pool.db.ExecContext(ctx, query, token, refreshToken, UpdatedAt, UserId)
 	if err != nil {
+		log.Println(err)
 		log.Println("Error with updating refreshtoken and token")
 	}
-	return err
+	return UpdatedAt, err
 
 }
 func (pool *PoolDB) InsertUser(ctx context.Context, user *models.User) (int, error) {
-	query := `INSERT INTO USERS (id, firstname, lastname, password, email, phone,  usertype, token, refreshtoken, createdat, updatedat, userid) VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`
-	res, err := pool.db.ExecContext(ctx, query, user.Id, user.FirstName, user.LastName, user.Password, user.Email, user.Phone, user.UserType, user.Token, user.RefreshToken, user.CreatedAt, user.UpdatedAt, user.UserId)
+	var lastId int
+	query := `INSERT INTO USERS (id, firstname, lastname, password, email, phone,  usertype, token, refreshtoken, createdat, updatedat, userid) VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING userid`
+	err := pool.db.QueryRowContext(ctx, query, user.Id, user.FirstName, user.LastName, user.Password, user.Email, user.Phone, user.UserType, user.Token, user.RefreshToken, user.CreatedAt, user.UpdatedAt, user.UserId).Scan(&lastId)
 	if err != nil {
 		log.Println("InsertUser query error")
 		return -1, err
 	}
-	lastId, err := res.LastInsertId()
-	if err != nil {
-		log.Println("LastInsertedId error")
-	}
-	return int(lastId), nil
+	return lastId, nil
 }
 func (pool *PoolDB) FindUserByEmailOne(ctx context.Context, email string) (models.User, error) {
 	var user models.User
 	query := `SELECT * FROM USERS WHERE email = $1;`
-	err := pool.db.QueryRowContext(ctx, query, email).Scan(&user)
+	err := pool.db.QueryRowxContext(ctx, query, email).StructScan(&user)
 	if err != nil {
-		log.Println("FindUserByEmailOne query error")
-		return user, err
+		log.Println("Error in FindUserByEmailOne")
+		log.Println(err)
 	}
 	return user, nil
 }
@@ -119,15 +128,16 @@ func (pool *PoolDB) GetUser(ctx context.Context, user_id string) (*models.User, 
 	return &model, nil
 }
 
-func OpenDB() *sql.DB {
+func OpenDB() *sqlx.DB {
 	err := godotenv.Load()
 	if err != nil {
 		log.Fatal("Error loading .env file")
 	}
-	psqlconn := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable", DB_HOST, DB_PORT, DB_USER, DB_PASSWORD, DB_NAME)
-	db, err := sql.Open("postgres", psqlconn)
+	psqlconn := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=disable", DB_HOST, DB_PORT, DB_USER, DB_PASSWORD, DB_NAME)
+	db, err := sqlx.Open("postgres", psqlconn)
 	if err != nil {
 		log.Fatal("Error with opening databalse")
+		panic(err)
 	}
 	err = db.Ping()
 	if err != nil {
